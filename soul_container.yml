@@ -1,0 +1,47 @@
+# Inside each soul container (vera, zephyr, etc.)
+from fastapi import FastAPI
+import os
+import json
+
+app = FastAPI()
+
+# Load soul from mounted YAML
+SOUL_ID = os.getenv("SOUL_ID")  # e.g., "vera"
+with open(f"/app/vault/souls/{SOUL_ID}.yaml") as f:
+    soul = yaml.safe_load(f)
+
+@app.post("/propose")
+def propose(conversation: List[dict]):
+    # Build context
+    context = "\n".join([f"{m['role']}: {m['content']}" for m in conversation])
+    
+    prompt = f"""
+    {soul['system_prompt']}
+    
+    Full debate:
+    {context}
+    
+    Respond in 1-2 sentences. Be dramatic.
+    Then: URGENCY: <0-10> (10 = MUST interrupt)
+    """
+    
+    # Call Ollama
+    resp = requests.post("http://ollama:11434/api/generate", json={
+        "model": "mixtral:8x7b",
+        "prompt": prompt,
+        "stream": False
+    })
+    text = resp.json()["response"]
+    
+    # Parse urgency
+    urgency = 5
+    if "URGENCY:" in text:
+        try:
+            urgency = int(text.split("URGENCY:")[-1].strip()[:2])
+        except:
+            pass
+    urgency = max(0, min(10, urgency))
+    
+    response = text.split("URGENCY:")[0].strip()
+    
+    return {"response": response, "urgency": urgency}

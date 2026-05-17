@@ -1,0 +1,27 @@
+# birth_souls.py
+import yaml
+import os
+
+# Load mega vault
+with open("vault/personalities.yaml") as f:
+    data = yaml.safe_load(f)
+    personalities = {p["id"]: p for p in data["personalities"]}
+
+# Pick 5
+souls = {
+    "vera": "entj_scorpio_v1",
+    "zephyr": "intp_aquarius_v1",
+    "elias": "istj_capricorn_v1",
+    "luna": "enfp_pisces_v1",
+    "rhea": "estj_leo_v1"
+}
+
+os.makedirs("vault/souls", exist_ok=True)
+
+for name, pid in souls.items():
+    soul = personalities[pid].copy()
+    soul["name"] = name.replace("_", " ").title()
+    soul["memory"] = []
+    with open(f"vault/souls/{name}.yaml", "w") as f:
+        yaml.dump(soul, f, sort_keys=False)
+    print(f"Birthed: {soul['name']} ({pid})")

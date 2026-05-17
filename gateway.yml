@@ -1,0 +1,53 @@
+# src/gateway.py
+from fastapi import FastAPI
+import requests
+from typing import List, Dict
+
+app = FastAPI(title="AI Drama Gateway", description="Taylor Swift-level debate chaos.")
+
+SOULS = ["vera", "zephyr", "elias", "luna", "rhea"]
+conversation: List[Dict] = []
+cooldown = {soul: 0 for soul in SOULS}
+
+@app.post("/debate")
+def run_dramatic_debate(topic: str, max_rounds: int = 12):
+    global conversation, cooldown
+    conversation = [{"role": "system", "content": f"DEBATE: {topic.upper()}"}]
+    cooldown = {soul: 0 for soul in SOULS}
+    
+    current_order = SOULS.copy()
+    
+    for round_num in range(max_rounds):
+        candidates = []
+        
+        for soul in current_order:
+            if cooldown[soul] > 0:
+                cooldown[soul] -= 1
+                continue
+                
+            try:
+                url = f"http://soul-{soul}:8000/propose"
+                resp = requests.post(url, json={"conversation": conversation}, timeout=10)
+                if resp.status_code != 200:
+                    continue
+                data = resp.json()
+                candidates.append({
+                    "soul": soul,
+                    "response": data["response"],
+                    "urgency": data["urgency"]
+                })
+            except:
+                continue  # soul down? skip
+        
+        if not candidates:
+            break
+            
+        # HIGHEST URGENCY WINS
+        winner = max(candidates, key=lambda x: x["urgency"])
+        conversation.append({"role": winner["soul"], "content": winner["response"]})
+        
+        # Cooldown + rotate
+        cooldown[winner["soul"]] = 2
+        current_order = [s for s in current_order if s != winner["soul"]] + [winner["soul"]]
+    
+    return {"conversation": conversation}
